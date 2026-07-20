@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class Screen {
-    CASHBOOK, REPORT, DELETED_TRANSACTIONS, PRODUCTS, DASHBOARD
+    CASHBOOK, REPORT, DELETED_TRANSACTIONS, PRODUCTS, DASHBOARD, SMART_SCAN, SETTINGS
 }
 
 /**
@@ -89,6 +89,12 @@ class MainActivity : ComponentActivity() {
                               onNavigateBack = { currentScreen = Screen.CASHBOOK }
                           )
                           Screen.DASHBOARD -> DashboardScreen()
+                          Screen.SMART_SCAN -> SmartScanScreen(
+                              onNavigateBack = { currentScreen = Screen.CASHBOOK }
+                          )
+                          Screen.SETTINGS -> SettingsScreen(
+                              onNavigateBack = { currentScreen = Screen.CASHBOOK }
+                          )
                       }
                   }
               }
@@ -121,11 +127,17 @@ class MainActivity : ComponentActivity() {
                           TextButton(onClick = { currentScreen = Screen.DASHBOARD; isDrawerOpen = false }) {
                               Text("Dashboard", color = Color.DarkGray)
                           }
+                          TextButton(onClick = { currentScreen = Screen.SMART_SCAN; isDrawerOpen = false }) {
+                              Text("Smart Scan (AI)", color = Color.DarkGray)
+                          }
                           TextButton(onClick = { currentScreen = Screen.REPORT; isDrawerOpen = false }) {
                               Text("Reports", color = Color.DarkGray)
                           }
                           TextButton(onClick = { currentScreen = Screen.DELETED_TRANSACTIONS; isDrawerOpen = false }) {
                               Text("Deleted", color = Color.DarkGray)
+                          }
+                          TextButton(onClick = { currentScreen = Screen.SETTINGS; isDrawerOpen = false }) {
+                              Text("Settings", color = Color.DarkGray)
                           }
                       }
 

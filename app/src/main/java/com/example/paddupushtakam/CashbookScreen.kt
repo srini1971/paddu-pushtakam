@@ -99,10 +99,22 @@ fun CashbookScreen(
     val customFieldsList by viewModel.customFields.collectAsState()
     val deletedTransactions by viewModel.deletedTransactions.collectAsState()
     val products by viewModel.allProducts.collectAsState()
+    val smartScanResult by viewModel.smartScanResult.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var dialogType by remember { mutableStateOf(TransactionType.IN) }
     var transactionToEdit by remember { mutableStateOf<TransactionEntity?>(null) }
+    var preFilledData by remember { mutableStateOf<SmartScanData?>(null) }
+
+    LaunchedEffect(smartScanResult) {
+        smartScanResult?.let { scanData ->
+            preFilledData = scanData
+            transactionToEdit = null
+            dialogType = TransactionType.OUT // Scanned receipts are usually expenses
+            showAddDialog = true
+            viewModel.clearSmartScanResult()
+        }
+    }
 
     val totalBalance = totalIn - totalOut
     val todayBalance = todayIn - todayOut
@@ -135,11 +147,13 @@ fun CashbookScreen(
             BottomActionButtons(
                 onOutClick = {
                     transactionToEdit = null
+                    preFilledData = null
                     dialogType = TransactionType.OUT
                     showAddDialog = true
                 },
                 onInClick = {
                     transactionToEdit = null
+                    preFilledData = null
                     dialogType = TransactionType.IN
                     showAddDialog = true
                 }
@@ -201,6 +215,7 @@ fun CashbookScreen(
                                 transaction = transaction,
                                 onLongClick = {
                                     transactionToEdit = it
+                                    preFilledData = null
                                     dialogType = it.type
                                     showAddDialog = true
                                 }
@@ -215,6 +230,7 @@ fun CashbookScreen(
             AddTransactionDialog(
                 type = dialogType,
                 editingTransaction = transactionToEdit,
+                preFilledData = preFilledData,
                 categories = categories,
                 customFieldsList = customFieldsList,
                 products = products,
@@ -618,6 +634,7 @@ fun TransactionItem(
 fun AddTransactionDialog(
     type: TransactionType,
     editingTransaction: TransactionEntity? = null,
+    preFilledData: SmartScanData? = null,
     categories: List<CategoryEntity>,
     customFieldsList: List<com.example.paddupushtakam.data.CustomFieldEntity>,
     products: List<com.example.paddupushtakam.data.ProductEntity>,
@@ -629,9 +646,14 @@ fun AddTransactionDialog(
     onAddCategory: (String) -> Unit,
     onAddCustomField: (String, String) -> Unit
 ) {
-    var amount by remember { mutableStateOf(TextFieldValue(editingTransaction?.amount?.let { "%.2f".format(it) } ?: "0.00", TextRange((editingTransaction?.amount?.let { "%.2f".format(it) } ?: "0.00").length))) }
-    var description by remember { mutableStateOf(editingTransaction?.description ?: "") }
-    var selectedCategory by remember { mutableStateOf<String?>(editingTransaction?.category) }
+    val initialAmount = editingTransaction?.amount?.let { "%.2f".format(it) } ?: preFilledData?.amount ?: "0.00"
+    var amount by remember { mutableStateOf(TextFieldValue(initialAmount, TextRange(initialAmount.length))) }
+    var description by remember { mutableStateOf(editingTransaction?.description ?: preFilledData?.description ?: "") }
+    
+    // Resolve category name against available categories
+    val resolvedCategory = editingTransaction?.category 
+        ?: preFilledData?.category?.takeIf { catName -> categories.any { it.name.equals(catName, ignoreCase = true) } }
+    var selectedCategory by remember { mutableStateOf<String?>(resolvedCategory) }
     var receiptUri by remember { mutableStateOf<Uri?>(editingTransaction?.receiptUri?.let { Uri.parse(it) }) }
     var expanded by remember { mutableStateOf(false) }
     var paymentModeExpanded by remember { mutableStateOf(false) }
@@ -676,7 +698,8 @@ fun AddTransactionDialog(
     val paymentModes = listOf("Cash", "UPI", "Bank Transfer", "Debit Card", "Credit Card")
     
     // Date Picker state
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = editingTransaction?.timestamp ?: System.currentTimeMillis())
+    val initialTime = editingTransaction?.timestamp ?: preFilledData?.dateMillis ?: System.currentTimeMillis()
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialTime)
     var showDatePicker by remember { mutableStateOf(false) }
     
     val photoPickerLauncher = rememberLauncherForActivityResult(

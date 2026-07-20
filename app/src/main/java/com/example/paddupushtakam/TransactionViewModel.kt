@@ -13,8 +13,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import android.graphics.Bitmap
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.content
+import org.json.JSONObject
+
+data class SmartScanData(
+    val amount: String,
+    val description: String,
+    val category: String,
+    val dateMillis: Long
+)
 
 /**
  * TransactionViewModel acts as the bridge between the UI (Screens) and the Data Layer (Database).
@@ -24,6 +36,52 @@ import java.util.Calendar
 class TransactionViewModel(application: Application) : AndroidViewModel(application) {
     // Get an instance of our DAO to interact with the database
     private val dao = AppDatabase.getDatabase(application).transactionDao()
+
+    private val _smartScanResult = MutableStateFlow<SmartScanData?>(null)
+    val smartScanResult: StateFlow<SmartScanData?> = _smartScanResult
+
+    private val _smartScanLoading = MutableStateFlow(false)
+    val smartScanLoading: StateFlow<Boolean> = _smartScanLoading
+
+    fun clearSmartScanResult() {
+        _smartScanResult.value = null
+    }
+
+    fun analyzeReceipt(bitmap: Bitmap, apiKey: String) {
+        viewModelScope.launch {
+            _smartScanLoading.value = true
+            try {
+                val generativeModel = GenerativeModel(
+                    modelName = "gemini-1.5-flash",
+                    apiKey = apiKey
+                )
+                
+                val inputContent = content {
+                    image(bitmap)
+                    text("Analyze this receipt and extract the following information. Return ONLY a valid JSON object with the following keys and string values: 'amount' (just the number), 'description' (name of store or items), 'category' (a short general category), 'timestamp' (the unix timestamp in milliseconds for the date, or just empty string if not found).")
+                }
+                
+                val response = generativeModel.generateContent(inputContent)
+                val text = response.text ?: ""
+                
+                // Clean up the response in case Gemini wraps it in markdown like ```json ... ```
+                val jsonString = text.replace("```json", "").replace("```", "").trim()
+                
+                val json = JSONObject(jsonString)
+                val amount = json.optString("amount", "")
+                val description = json.optString("description", "")
+                val category = json.optString("category", "")
+                val timestampStr = json.optString("timestamp", "")
+                val dateMillis = timestampStr.toLongOrNull() ?: System.currentTimeMillis()
+                
+                _smartScanResult.value = SmartScanData(amount, description, category, dateMillis)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _smartScanLoading.value = false
+            }
+        }
+    }
 
     // A reactive stream of ALL non-deleted transactions. 
     // When the database changes, this flow automatically updates the UI.

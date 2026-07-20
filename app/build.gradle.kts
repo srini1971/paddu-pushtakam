@@ -97,4 +97,7 @@ dependencies {
   // ZXing for Barcode scanning
   implementation("com.journeyapps:zxing-android-embedded:4.3.0")
   implementation("com.google.zxing:core:3.5.3")
+  
+  // Gemini API
+  implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 }
