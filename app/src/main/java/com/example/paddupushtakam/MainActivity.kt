@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 enum class Screen {
-    CASHBOOK, REPORT, DELETED_TRANSACTIONS, PRODUCTS, DASHBOARD, SMART_SCAN, SETTINGS
+    CASHBOOK, REPORT, DELETED_TRANSACTIONS, PRODUCTS, DASHBOARD, SMART_SCAN, AI_CHAT, SETTINGS
 }
 
 /**
@@ -92,6 +92,9 @@ class MainActivity : ComponentActivity() {
                           Screen.SMART_SCAN -> SmartScanScreen(
                               onNavigateBack = { currentScreen = Screen.CASHBOOK }
                           )
+                          Screen.AI_CHAT -> AiChatScreen(
+                              onNavigateBack = { currentScreen = Screen.CASHBOOK }
+                          )
                           Screen.SETTINGS -> SettingsScreen(
                               onNavigateBack = { currentScreen = Screen.CASHBOOK }
                           )
@@ -129,6 +132,9 @@ class MainActivity : ComponentActivity() {
                           }
                           TextButton(onClick = { currentScreen = Screen.SMART_SCAN; isDrawerOpen = false }) {
                               Text("Smart Scan (AI)", color = Color.DarkGray)
+                          }
+                          TextButton(onClick = { currentScreen = Screen.AI_CHAT; isDrawerOpen = false }) {
+                              Text("AI Assistant (Chat)", color = Color.DarkGray)
                           }
                           TextButton(onClick = { currentScreen = Screen.REPORT; isDrawerOpen = false }) {
                               Text("Reports", color = Color.DarkGray)

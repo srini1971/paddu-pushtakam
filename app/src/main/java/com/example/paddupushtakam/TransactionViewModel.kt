@@ -28,6 +28,11 @@ data class SmartScanData(
     val dateMillis: Long
 )
 
+data class ChatMessage(
+    val role: String,
+    val text: String
+)
+
 /**
  * TransactionViewModel acts as the bridge between the UI (Screens) and the Data Layer (Database).
  * It holds the state of the UI and survives configuration changes (like screen rotations).
@@ -42,6 +47,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _smartScanLoading = MutableStateFlow(false)
     val smartScanLoading: StateFlow<Boolean> = _smartScanLoading
+
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages
 
     fun clearSmartScanResult() {
         _smartScanResult.value = null
@@ -79,6 +87,58 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 e.printStackTrace()
             } finally {
                 _smartScanLoading.value = false
+            }
+        }
+    }
+
+    fun askAiAssistant(query: String, apiKey: String) {
+        if (query.isBlank() || apiKey.isBlank()) return
+        
+        viewModelScope.launch {
+            val currentList = _chatMessages.value.toMutableList()
+            currentList.add(ChatMessage("user", query))
+            
+            val loadingIdx = currentList.size
+            currentList.add(ChatMessage("model", "Thinking..."))
+            _chatMessages.value = currentList
+            
+            try {
+                val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
+                val recentTransactions = allTransactions.value.filter { it.timestamp >= thirtyDaysAgo }
+                
+                val txContext = recentTransactions.joinToString("\n") { tx ->
+                    val type = if(tx.type == TransactionType.IN) "Income" else "Expense"
+                    val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(tx.timestamp))
+                    "[$date] $type: ${tx.amount} (${tx.category}) - ${tx.description ?: ""}"
+                }
+                
+                val prompt = """
+                    You are a helpful financial assistant for 'Paddu Pushtakam' cashbook app.
+                    The user may ask questions in English or Telugu.
+                    Here is the user's recent transaction history for context:
+                    $txContext
+                    
+                    User question: $query
+                    
+                    Answer clearly, naturally, and concisely based ONLY on the provided transaction history.
+                """.trimIndent()
+                
+                val generativeModel = GenerativeModel(
+                    modelName = "gemini-1.5-flash",
+                    apiKey = apiKey
+                )
+                
+                val response = generativeModel.generateContent(prompt)
+                
+                val updatedList = _chatMessages.value.toMutableList()
+                updatedList[loadingIdx] = ChatMessage("model", response.text?.trim() ?: "Sorry, I couldn't process that.")
+                _chatMessages.value = updatedList
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                val updatedList = _chatMessages.value.toMutableList()
+                updatedList[loadingIdx] = ChatMessage("model", "Error connecting to AI Assistant.")
+                _chatMessages.value = updatedList
             }
         }
     }
